@@ -1,6 +1,7 @@
 package com.tkachev.cloudfilestorage.services;
 
 import com.tkachev.cloudfilestorage.dto.PersonDTO;
+import com.tkachev.cloudfilestorage.exceptions.UserAlreadyExists;
 import com.tkachev.cloudfilestorage.exceptions.UserNotFoundException;
 import com.tkachev.cloudfilestorage.models.Person;
 import com.tkachev.cloudfilestorage.repositories.PeopleRepository;
@@ -18,6 +19,10 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
 
     public void registerUser(PersonDTO personDTO) {
+        Optional<Person> existingPerson = peopleRepository.findByUsername(personDTO.getUsername());
+        if (existingPerson.isPresent()) {
+            throw new UserAlreadyExists();
+        }
         Person person = fromDTO(personDTO);
         person.setPassword(passwordEncoder.encode(person.getPassword()));
         peopleRepository.save(person);
