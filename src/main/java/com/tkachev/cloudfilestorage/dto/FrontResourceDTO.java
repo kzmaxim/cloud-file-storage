@@ -22,7 +22,7 @@ public class FrontResourceDTO {
         if (obj.getIsDir() && !fullPath.endsWith("/")) fullPath += "/";
         return new FrontResourceDTO(
                 obj.getName(),
-                obj.getIsDir() ? null : 0, // размер
+                obj.getIsDir() ? null : 0,
                 fullPath,
                 obj.getIsDir()
         );

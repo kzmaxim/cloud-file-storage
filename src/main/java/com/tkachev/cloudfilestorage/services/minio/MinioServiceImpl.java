@@ -7,9 +7,11 @@ import com.tkachev.cloudfilestorage.util.MinioFrontMapper;
 import com.tkachev.cloudfilestorage.util.MinioMapper;
 import com.tkachev.cloudfilestorage.util.MinioUtil;
 import io.minio.*;
+import io.minio.errors.ErrorResponseException;
 import io.minio.messages.DeleteError;
 import io.minio.messages.DeleteObject;
 import io.minio.messages.Item;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,11 +20,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -53,10 +58,6 @@ public class MinioServiceImpl implements MinioService {
         if (!objectPath.endsWith("/") && objectPath.contains(".")) {
             objectPath = objectPath.trim();
         }
-
-        System.out.println("BUCKET: " + bucket);
-        System.out.println("USER PREFIX: " + userPrefix);
-        System.out.println("OBJECT PATH: " + objectPath);
 
         try {
             StatObjectResponse stat = minioClient.statObject(
@@ -104,33 +105,78 @@ public class MinioServiceImpl implements MinioService {
     /**
      * Создание папки
      */
+//    @Override
+//    public List<FrontResourceDTO> createDirectory(Integer userId, String path) {
+//
+//        try (ByteArrayInputStream emptyContent = new ByteArrayInputStream(new byte[0])) {
+//
+//            String userPrefix = MinioUtil.usePrefix(userId);
+//            String normalizedPath = MinioUtil.normalizePath(userPrefix + path, true);
+//            minioClient.putObject(
+//                    PutObjectArgs.builder()
+//                            .bucket(bucket)
+//                            .object(normalizedPath)
+//                            .stream(emptyContent, 0, -1)
+//                            .build()
+//            );
+//
+//            String folderName = MinioUtil.getName(normalizedPath);
+//            String parentPath = MinioUtil.getParentPath(normalizedPath).substring(userPrefix.length());
+//
+//            MinioObjectDTO dto = MinioObjectDTO.builder()
+//                    .name(folderName)
+//                    .path(parentPath)
+//                    .isDir(true)
+//                    .build();
+//
+//
+//            return List.of(MinioFrontMapper.toFront(dto));
+//        } catch (Exception e) {
+//            throw new MinioDirectoryCreateException("Failed to create directory: " + path, e);
+//        }
+//    }
+
+
     @Override
     public List<FrontResourceDTO> createDirectory(Integer userId, String path) {
+        String userPrefix = MinioUtil.usePrefix(userId);
+        String normalizedPath = MinioUtil.normalizePath(userPrefix + path, true);
 
-        try (ByteArrayInputStream emptyContent = new ByteArrayInputStream(new byte[0])) {
-
-            String userPrefix = MinioUtil.usePrefix(userId);
-            boolean isDir = path.endsWith("/");
-            String normalizedPath = MinioUtil.normalizePath(userPrefix + path, true);
-            minioClient.putObject(
-                    PutObjectArgs.builder()
+        try {
+            // Проверка на существование папки
+            Iterable<Result<Item>> items = minioClient.listObjects(
+                    ListObjectsArgs.builder()
                             .bucket(bucket)
-                            .object(normalizedPath)
-                            .stream(emptyContent, 0, -1)
+                            .prefix(normalizedPath)
+                            .recursive(false)
                             .build()
             );
+            if (items.iterator().hasNext()) {
+                throw new MinioDirectoryCreateException("Directory already exists: " + path);
+            }
 
-            String folderName = MinioUtil.getName(normalizedPath); // "folder32/"
-            String parentPath = MinioUtil.getParentPath(normalizedPath).substring(userPrefix.length()); // "" если это корень
+            try (ByteArrayInputStream emptyContent = new ByteArrayInputStream(new byte[0])) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucket)
+                                .object(normalizedPath)
+                                .stream(emptyContent, 0, -1)
+                                .build()
+                );
 
-            MinioObjectDTO dto = MinioObjectDTO.builder()
-                    .name(folderName)
-                    .path(parentPath)
-                    .isDir(true)
-                    .build();
+                String folderName = MinioUtil.getName(normalizedPath);
+                String parentPath = MinioUtil.getParentPath(normalizedPath).substring(userPrefix.length());
 
+                MinioObjectDTO dto = MinioObjectDTO.builder()
+                        .name(folderName)
+                        .path(parentPath)
+                        .isDir(true)
+                        .build();
 
-            return List.of(MinioFrontMapper.toFront(dto));
+                return List.of(MinioFrontMapper.toFront(dto));
+            }
+        } catch (MinioDirectoryCreateException e) {
+            throw e; // 400: папка уже существует
         } catch (Exception e) {
             throw new MinioDirectoryCreateException("Failed to create directory: " + path, e);
         }
@@ -146,7 +192,6 @@ public class MinioServiceImpl implements MinioService {
     @Override
     public List<FrontResourceDTO> uploadFiles(Integer userId, String userFolder, MultipartFile[] files) {
         String userPrefix = MinioUtil.usePrefix(userId);
-        // всегда заканчиваем слэшем
         userFolder = MinioUtil.normalizePath(userFolder, true);
         String folderPath = userPrefix + userFolder;
 
@@ -157,7 +202,6 @@ public class MinioServiceImpl implements MinioService {
                 String fileName = file.getOriginalFilename();
                 if (fileName == null || fileName.isEmpty()) continue;
 
-                // убедимся, что объект формируется правильно
                 String objectName = folderPath + fileName;
 
                 try (InputStream in = file.getInputStream()) {
@@ -173,7 +217,7 @@ public class MinioServiceImpl implements MinioService {
 
                 MinioObjectDTO dto = MinioObjectDTO.builder()
                         .name(fileName)
-                        .path(folderPath) // путь до родителя
+                        .path(folderPath)
                         .isDir(false)
                         .size((int) file.getSize())
                         .build();
@@ -196,7 +240,6 @@ public class MinioServiceImpl implements MinioService {
      */
     @Override
     public FrontResourceDTO renameFile(Integer userId, String oldPath, String newFileName) {
-        System.out.println("Renaming file from " + oldPath + " to " + newFileName);
         String userPrefix = MinioUtil.usePrefix(userId);
 
         String relativeOldPath = oldPath.startsWith(userPrefix) ? oldPath.substring(userPrefix.length()) : oldPath;
@@ -204,15 +247,12 @@ public class MinioServiceImpl implements MinioService {
 
 
         String parentPath = MinioUtil.getParentPath(relativeOldPath);
-        System.out.println("Parent path: " + parentPath);
 
         String cleanFileName = Paths.get(newFileName).getFileName().toString();
 
         String newObjectName = userPrefix + parentPath + cleanFileName;
-        System.out.println("New object name: " + newObjectName);
 
         String fullOldPath = userPrefix + relativeOldPath;
-        System.out.println("Full old path: " + fullOldPath);
 
         try {
             copyAndDelete(fullOldPath, newObjectName);
@@ -302,7 +342,6 @@ public class MinioServiceImpl implements MinioService {
                 );
             }
 
-            // Возвращаем DTO с новой папкой
             MinioObjectDTO dto = MinioObjectDTO.builder()
                     .name(newDirName + "/")
                     .path(userPrefix)
@@ -375,9 +414,6 @@ public class MinioServiceImpl implements MinioService {
         if (!fullPath.endsWith("/")) {
             fullPath += "/";
         }
-
-        System.out.println("BUCKET: " + bucket);
-        System.out.println("FULL PATH: " + fullPath);
 
         try {
             Iterable<Result<Item>> results = minioClient.listObjects(
@@ -493,6 +529,80 @@ public class MinioServiceImpl implements MinioService {
             throw new MinioSearchException("Failed to search resources by query: " + query, e);
         }
     }
+
+
+    @Override
+    public void downloadResource(Integer userId, String path, HttpServletResponse response) {
+        if (userId == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return;
+        }
+        if (path == null || path.trim().isEmpty()) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+
+        String userPrefix = MinioUtil.usePrefix(userId);
+        String fullPath = userPrefix + path;
+        boolean isDir = path.endsWith("/");
+
+        try {
+            if (isDir) {
+                Iterable<Result<Item>> items = minioClient.listObjects(
+                        ListObjectsArgs.builder()
+                                .bucket(bucket)
+                                .prefix(fullPath)
+                                .recursive(true)
+                                .build()
+                );
+                Iterator<Result<Item>> iterator = items.iterator();
+                if (!iterator.hasNext()) {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    return;
+                }
+
+                response.setStatus(HttpServletResponse.SC_OK);
+                response.setContentType("application/zip");
+                response.setHeader("Content-Disposition",
+                        "attachment; filename=\"" + MinioUtil.getName(path) + ".zip\"");
+
+                try (ZipOutputStream zos = new ZipOutputStream(response.getOutputStream())) {
+                    while (iterator.hasNext()) {
+                        Item item = iterator.next().get();
+                        if (item.isDir()) continue;
+                        String entryName = item.objectName().substring(fullPath.length());
+                        if (entryName.isEmpty()) continue;
+                        zos.putNextEntry(new ZipEntry(entryName));
+                        try (InputStream in = minioClient.getObject(
+                                GetObjectArgs.builder().bucket(bucket).object(item.objectName()).build())) {
+                            in.transferTo(zos);
+                        }
+                        zos.closeEntry();
+                    }
+                }
+            } else {
+                try (InputStream in = minioClient.getObject(
+                        GetObjectArgs.builder().bucket(bucket).object(fullPath).build())) {
+
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.setContentType("application/octet-stream");
+                    response.setHeader("Content-Disposition",
+                            "attachment; filename=\"" + MinioUtil.getName(path) + "\"");
+                    in.transferTo(response.getOutputStream());
+                } catch (ErrorResponseException e) {
+                    if ("NoSuchKey".equals(e.errorResponse().code())) {
+                        response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                        return;
+                    }
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+
 
 
 

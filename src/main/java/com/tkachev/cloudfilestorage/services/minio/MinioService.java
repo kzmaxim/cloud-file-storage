@@ -2,6 +2,7 @@ package com.tkachev.cloudfilestorage.services.minio;
 
 import com.tkachev.cloudfilestorage.dto.FrontResourceDTO;
 import com.tkachev.cloudfilestorage.dto.MinioObjectDTO;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,4 +19,5 @@ public interface MinioService {
     List<FrontResourceDTO> folderList(Integer userId, String path);
     void deleteResource(Integer userId, String path);
     List<FrontResourceDTO> searchResources(Integer userId, String query) throws FileNotFoundException;
+    void downloadResource(Integer userId, String path, HttpServletResponse response);
 }

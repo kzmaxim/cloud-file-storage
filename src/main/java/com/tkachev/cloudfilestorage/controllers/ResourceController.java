@@ -3,6 +3,7 @@ package com.tkachev.cloudfilestorage.controllers;
 import com.tkachev.cloudfilestorage.dto.FrontResourceDTO;
 import com.tkachev.cloudfilestorage.security.PersonDetails;
 import com.tkachev.cloudfilestorage.services.minio.MinioServiceImpl;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -64,7 +65,6 @@ public class ResourceController {
         Integer userId = personDetails.getUserId();
         String decodedUserFolder = URLDecoder.decode(userFolder, StandardCharsets.UTF_8);
         List<FrontResourceDTO> response = minioService.uploadFiles(userId, decodedUserFolder, files);
-        //List<FrontResourceDTO> resources = minioService.folderList(userId, userFolder);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -76,6 +76,18 @@ public class ResourceController {
         String decodedPath = URLDecoder.decode(path, StandardCharsets.UTF_8);
         minioService.deleteResource(userId, decodedPath);
         return ResponseEntity.status(204).build();
+    }
+
+
+    @GetMapping("/download")
+    public ResponseEntity<FrontResourceDTO> downloadResource(
+            @RequestParam(name="path") String path,
+            @AuthenticationPrincipal PersonDetails personDetails,
+            HttpServletResponse response) throws Exception {
+        Integer userId = personDetails.getUserId();
+        String decodedPath = URLDecoder.decode(path, StandardCharsets.UTF_8);
+        minioService.downloadResource(userId, decodedPath, response);
+        return ResponseEntity.ok().build();
     }
 
 
