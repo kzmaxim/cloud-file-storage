@@ -5,5 +5,5 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class SuccessResponseDTO {
-    private String message;
+    private String username;
 }

@@ -3,6 +3,9 @@ package com.tkachev.cloudfilestorage.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tkachev.cloudfilestorage.dto.ErrorDTO;
 import com.tkachev.cloudfilestorage.dto.SuccessResponseDTO;
+import com.tkachev.cloudfilestorage.security.JsonFailureAuthHandler;
+import com.tkachev.cloudfilestorage.security.JsonSuccessAuthHandler;
+import com.tkachev.cloudfilestorage.security.JsonUsernamePasswordAuthenticationFilter;
 import com.tkachev.cloudfilestorage.services.PersonDetailsService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +20,9 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -27,38 +33,42 @@ public class SecurityConfig {
     private final ObjectMapper objectMapper;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
+        JsonUsernamePasswordAuthenticationFilter filter = new JsonUsernamePasswordAuthenticationFilter();
+        filter.setAuthenticationManager(authenticationManager);
+        filter.setFilterProcessesUrl("/api/auth/sign-in");
+        filter.setAuthenticationSuccessHandler(new JsonSuccessAuthHandler(objectMapper));
+        filter.setAuthenticationFailureHandler(new JsonFailureAuthHandler(objectMapper));
+
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/sign-in", "/api/auth/sign-up").permitAll()
+                        .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().hasAnyRole("ADMIN", "USER")
                 )
-                .formLogin(form -> form
-                        .loginProcessingUrl("/api/auth/sign-in")
-                        .usernameParameter("username")
-                        .passwordParameter("password")
-                        .successHandler((request, response, authentication) -> {
-                            response.setContentType("application/json");
-                            response.setCharacterEncoding("UTF-8");
-                            response.setStatus(HttpServletResponse.SC_OK);
-
-                            SuccessResponseDTO successResponseDTO = new SuccessResponseDTO(authentication.getName());
-                            response.getWriter().write(objectMapper.writeValueAsString(successResponseDTO));
-                        })
-                        .failureHandler((request, response, exception) -> {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            response.setCharacterEncoding("UTF-8");
-                            ErrorDTO errorDTO = new ErrorDTO(exception.getMessage());
-                            response.getWriter().write(objectMapper.writeValueAsString(errorDTO));
-                        })
-                        .permitAll()
-                )
+                .addFilterAt(filter, JsonUsernamePasswordAuthenticationFilter.class)
                 .logout(logout -> logout
-                        .logoutUrl("/api/auth/logout")
-                        .logoutSuccessUrl("/api/auth/sign-in")
-                );
+                        .logoutUrl("/api/auth/sign-out")
+                        .logoutSuccessHandler((request, response, authentication) -> {
+                            if (authentication == null) {
+                                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                                ErrorDTO errorDTO = new ErrorDTO("Not authenticated");
+                                response.setContentType("application/json");
+                                response.setCharacterEncoding("UTF-8");
+                                response.getWriter().write(objectMapper.writeValueAsString(errorDTO));
+                            } else {
+                                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
+                                response.getWriter().write("");
+                            }
+                        })
+                ).cors(cors -> cors.configurationSource(request -> {
+                    var config = new CorsConfiguration();
+                    config.setAllowedOrigins(List.of("http://localhost:3000"));
+                    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+                    config.setAllowedHeaders(List.of("*"));
+                    config.setAllowCredentials(true);
+                    return config;
+                }));
 
         return http.build();
     }

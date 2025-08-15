@@ -21,6 +21,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(404).body(new ErrorDTO(ex.getMessage()));
     }
 
+    @ExceptionHandler(PathNotFoundException.class)
+    public ResponseEntity<ErrorDTO> handlePathNotFoundException(PathNotFoundException ex) {
+        return ResponseEntity.status(400).body(new ErrorDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(UserNotAuthorizeException.class)
+    public ResponseEntity<ErrorDTO> handleUserNotAuthorizeException(UserNotAuthorizeException ex) {
+        return ResponseEntity.status(401).body(new ErrorDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorDTO> handleResourceNotFoundException(ResourceNotFoundException ex) {
+        return ResponseEntity.status(404).body(new ErrorDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(MinioFileUploadException.class)
+    public ResponseEntity<ErrorDTO> handleMinioFileUploadException(MinioFileUploadException ex) {
+        return ResponseEntity.status(500).body(new ErrorDTO("File upload failed: " + ex.getMessage()));
+    }
+
     @ExceptionHandler
     public ResponseEntity<ErrorDTO> handleException(Exception ex) {
         return ResponseEntity.status(500).body(new ErrorDTO("An unexpected error occurred: " + ex.getMessage()));
