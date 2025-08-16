@@ -89,8 +89,4 @@ public class ResourceController {
         minioService.downloadResource(userId, decodedPath, response);
         return ResponseEntity.ok().build();
     }
-
-
-
-
 }
