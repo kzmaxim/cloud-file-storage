@@ -4,7 +4,7 @@
 использовать его для загрузки и хранения файлов. Источником вдохновения
 для проекта является Google Drive.
 
-## Что нужно знать
+## Стек технологий
 
 -   Java (коллекции, ООП)
 -   Maven/Gradle
@@ -91,7 +91,7 @@
 ## SQL база данных
 
 -   PostgreSQL (структура Users + индексы)
--   Миграции (Flyway или Liquibase)
+-   Миграции (Liquibase)
 
 ## Хранилище файлов S3
 
@@ -111,7 +111,7 @@
 
 ## Запуск проекта
 
-Клонируйте [репозиторий](https://github.com/zhukovsd/cloud-storage-frontend)) фронтенда
+Клонируйте [репозиторий](https://github.com/zhukovsd/cloud-storage-frontend) фронтенда
 В файле public/config.js поменяйте функцию маппинга на:
 ```javascript
 mapObjectToFrontFormat: (obj) => {
