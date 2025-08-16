@@ -3,9 +3,11 @@ package com.tkachev.cloudfilestorage.controllers;
 import com.tkachev.cloudfilestorage.dto.FrontResourceDTO;
 import com.tkachev.cloudfilestorage.security.PersonDetails;
 import com.tkachev.cloudfilestorage.services.minio.MinioServiceImpl;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +25,12 @@ public class ResourceController {
 
     private final MinioServiceImpl minioService;
 
+
+    @Operation(
+            summary = "Получить ресурс по пути",
+            description = "Возвращает информацию о ресурсе по указанному пути. " +
+                    "Если ресурс не найден, возвращается ошибка 404."
+    )
     @GetMapping
     public ResponseEntity<FrontResourceDTO> getResource(@RequestParam(name="path") String path,
                                                         @AuthenticationPrincipal PersonDetails personDetails) throws Exception {
@@ -32,6 +40,11 @@ public class ResourceController {
         return ResponseEntity.ok(resource);
     }
 
+    @Operation(
+            summary = "Переместить ресурс",
+            description = "Перемещает ресурс из одного пути в другой. " +
+                    "Если перемещение успешно, возвращается информация о новом ресурсе."
+    )
     @GetMapping("/move")
     public ResponseEntity<FrontResourceDTO> moveResource(@RequestParam(name="from") String oldPath,
                                              @RequestParam(name="to") String newFileName,
@@ -47,6 +60,11 @@ public class ResourceController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(
+            summary = "Поиск ресурсов",
+            description = "Ищет ресурсы по заданному запросу. " +
+                    "Возвращает список ресурсов, соответствующих запросу."
+    )
     @GetMapping("/search")
     public ResponseEntity<List<FrontResourceDTO>> searchResources(
             @RequestParam(name="query") String query,
@@ -57,9 +75,15 @@ public class ResourceController {
         return ResponseEntity.ok(resources);
     }
 
-    @PostMapping
+
+    @Operation(
+            summary = "Загрузить файлы",
+            description = "Загружает один или несколько файлов в указанную директорию. " +
+                    "Если параметр не указан, файлы загружаются в корневую директорию."
+    )
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<List<FrontResourceDTO>> uploadFiles(
-            @RequestParam("object") MultipartFile[] files,
+            @RequestPart("object") MultipartFile[] files,
             @RequestParam(name="path", required = false) String userFolder,
             @AuthenticationPrincipal PersonDetails personDetails) {
         Integer userId = personDetails.getUserId();
@@ -68,6 +92,11 @@ public class ResourceController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @Operation(
+            summary = "Удалить ресурс",
+            description = "Удаляет ресурс по указанному пути. " +
+                    "Если ресурс не найден, возвращается ошибка 404."
+    )
     @DeleteMapping
     public ResponseEntity<Void> deleteResource(
             @RequestParam(name="path") String path,
@@ -79,6 +108,11 @@ public class ResourceController {
     }
 
 
+    @Operation(
+            summary = "Скачать ресурс",
+            description = "Скачивает ресурс по указанному пути. " +
+                    "Если ресурс не найден, возвращается ошибка 404."
+    )
     @GetMapping("/download")
     public ResponseEntity<FrontResourceDTO> downloadResource(
             @RequestParam(name="path") String path,

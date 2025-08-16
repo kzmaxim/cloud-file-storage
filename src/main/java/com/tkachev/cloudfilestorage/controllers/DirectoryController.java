@@ -3,6 +3,7 @@ package com.tkachev.cloudfilestorage.controllers;
 import com.tkachev.cloudfilestorage.dto.FrontResourceDTO;
 import com.tkachev.cloudfilestorage.security.PersonDetails;
 import com.tkachev.cloudfilestorage.services.minio.MinioServiceImpl;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +21,12 @@ public class DirectoryController {
 
     private final MinioServiceImpl minioService;
 
-
+    @Operation(
+            summary = "Получить содержимое директории",
+            description = "Возвращает список ресурсов в указанной директории. " +
+                    "Параметр path должен быть закодирован в формате URL. " +
+                    "Если параметр не указан, возвращается корневая директория."
+    )
     @GetMapping
     public ResponseEntity<List<FrontResourceDTO>> getDirectoryContents(
             @RequestParam(name="path") String path,
@@ -36,6 +42,12 @@ public class DirectoryController {
         return ResponseEntity.ok(resource);
     }
 
+    @Operation(
+            summary = "Создать директорию",
+            description = "Создает новую директорию по указанному пути. " +
+                    "Параметр path должен быть закодирован в формате URL. " +
+                    "Если директория уже существует, возвращается ошибка."
+    )
     @PostMapping
     public ResponseEntity<List<FrontResourceDTO>> createDirectory(
             @RequestParam(name="path") String path,

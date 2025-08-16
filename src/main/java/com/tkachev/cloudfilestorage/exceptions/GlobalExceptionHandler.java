@@ -7,6 +7,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.io.FileNotFoundException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -35,6 +37,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorDTO> handleResourceNotFoundException(ResourceNotFoundException ex) {
         return ResponseEntity.status(404).body(new ErrorDTO(ex.getMessage()));
+    }
+
+    @ExceptionHandler(FileNotFoundException.class)
+    public ResponseEntity<ErrorDTO> handleFileNotFoundException(FileNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorDTO("File not found: " + ex.getMessage()));
     }
 
     @ExceptionHandler(MinioFileUploadException.class)
@@ -82,6 +90,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler
     public ResponseEntity<ErrorDTO> handleException(Exception ex) {
+        if (ex.getCause() instanceof ResourceNotFoundException rnf) {
+            return ResponseEntity.status(404).body(new ErrorDTO(rnf.getMessage()));
+        }
         return ResponseEntity.status(500).body(new ErrorDTO("An unexpected error occurred: " + ex.getMessage()));
     }
 }

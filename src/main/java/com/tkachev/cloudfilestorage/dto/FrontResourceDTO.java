@@ -1,6 +1,7 @@
 package com.tkachev.cloudfilestorage.dto;
 
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,20 +12,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class FrontResourceDTO {
+    @Schema(description = "Имя ресурса", example = "John")
     private String name;
+
+    @Schema(description = "Размер ресурса в байтах", example = "1024")
     private Integer size;
+
+    @Schema(description = "Путь к ресурсу", example = "/documents/report.pdf")
     private String path;
+
+    @Schema(description = "Флаг, указывающий, является ли ресурс папкой", example = "false")
     private boolean folder;
-
-
-    public static FrontResourceDTO fromMinio(MinioObjectDTO obj) {
-        String fullPath = obj.getPath();
-        if (obj.getIsDir() && !fullPath.endsWith("/")) fullPath += "/";
-        return new FrontResourceDTO(
-                obj.getName(),
-                obj.getIsDir() ? null : 0,
-                fullPath,
-                obj.getIsDir()
-        );
-    }
 }
