@@ -6,6 +6,7 @@ import com.tkachev.cloudfilestorage.dto.PersonDTO;
 import com.tkachev.cloudfilestorage.exceptions.UserAlreadyExists;
 import com.tkachev.cloudfilestorage.models.Person;
 import com.tkachev.cloudfilestorage.repositories.PeopleRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -20,6 +21,11 @@ public class AuthServiceIntegrationTest extends BaseIntegrationTest {
     private AuthService authService;
     @Autowired
     private PeopleRepository peopleRepository;
+
+    @BeforeEach
+    void clearDb() {
+        peopleRepository.deleteAll();
+    }
 
     @Test
     void userShouldBeCreated() {
